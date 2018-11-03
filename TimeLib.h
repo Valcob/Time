@@ -21,6 +21,10 @@
 typedef unsigned long time_t;
 #endif
 
+static bool _daylight        = false;  ///< Does this time zone have daylight saving?
+static int8_t _timeZone      = 0;      ///< Keep track of set time zone offset
+static int8_t _minutesOffset = 0;      ///< Minutes offset for time zones with decimal numbers
+
 
 // This ugly hack allows us to define C++ overloaded functions, when included
 // from within an extern "C", as newlib's sys/stat.h does.  Actually it is
@@ -31,6 +35,9 @@ typedef unsigned long time_t;
 // but at least this hack lets us define C++ functions as intended.  Hopefully
 // nothing too terrible will result from overriding the C library header?!
 extern "C++" {
+
+
+
 typedef enum {timeNotSet, timeNeedsSync, timeSet
 }  timeStatus_t ;
 
@@ -137,6 +144,104 @@ void    setSyncInterval(time_t interval); // set the number of seconds between r
 /* low level functions to convert to and from system time                     */
 void breakTime(time_t time, tmElements_t &tm);  // break time_t into elements
 time_t makeTime(tmElements_t &tm);  // convert time elements into time_t
+
+/**
+* True if current time is inside DST period (aka. summer time). False otherwise of if NTP object has DST
+* calculation disabled
+* @param[out] True = summertime enabled and time in summertime period
+*			  False = sumertime disabled or time ouside summertime period
+*/
+boolean isSummerTime () {
+    if (_daylight)
+        return isSummerTimePeriod (now ());
+    else
+        return false;
+}
+
+/**
+* Set daylight time saving option.
+* @param[in] true is daylight time savings apply.
+*/
+void setDayLight (bool daylight) {
+    _daylight = daylight;
+    DEBUGLOG ("--Set daylight saving %s\n", daylight ? "ON" : "OFF");
+    setTime (getTime ());
+}
+
+/**
+* Get daylight time saving option.
+* @param[out] true is daylight time savings apply.
+*/
+bool getDayLight () {
+    return _daylight;
+}
+
+/**
+* Calculates the daylight saving for a given date.
+* @param[in] Year.
+* @param[in] Month.
+* @param[in] Day.
+* @param[in] Hour.
+* @param[in] Time zone offset.
+* @param[out] true if date and time are inside summertime period.
+*/
+bool summertime (int year, byte month, byte day, byte hour, byte tzHours)
+// input parameters: "normal time" for year, month, day, hour and tzHours (0=UTC, 1=MEZ)
+{
+    if ((month < 3) || (month > 10)) return false; // keine Sommerzeit in Jan, Feb, Nov, Dez
+    if ((month > 3) && (month < 10)) return true; // Sommerzeit in Apr, Mai, Jun, Jul, Aug, Sep
+    if ((month == 3 && (hour + 24 * day) >= (1 + tzHours + 24 * (31 - (5 * year / 4 + 4) % 7))) || (month == 10 && (hour + 24 * day) < (1 + tzHours + 24 * (31 - (5 * year / 4 + 1) % 7))))
+        return true;
+    else
+        return false;
+}
+
+/**
+* Gets timezone.
+* @param[out] Time offset in hours (plus or minus).
+*/
+int8_t getTimeZone () {
+    return _timeZone;
+}
+
+/**
+* Gets minutes fraction of timezone.
+* @param[out] Minutes offset (plus or minus) added to hourly offset.
+*/
+int8_t getTimeZoneMinutes () {
+    return _minutesOffset;
+}
+
+/**
+* Sets timezone.
+* @param[in] New time offset in hours (-11 <= timeZone <= +13).
+* @param[out] True if everything went ok.
+*/
+bool setTimeZone (int8_t timeZone, int8_t minutes) {
+    if ((timeZone >= -12) && (timeZone <= 14) && (minutes >= -59) && (minutes <= 59)) {
+        // Temporarily set time to new time zone, before trying to synchronize
+        int8_t timeDiff = timeZone - _timeZone;
+        _timeZone = timeZone;
+        _minutesOffset = minutes;
+        setTime (now () + timeDiff * SECS_PER_HOUR + minutes * SECS_PER_MIN);
+        if (udp && (timeStatus () != timeNotSet)) {
+            setTime (getTime ());
+        }
+        DEBUGLOG ("NTP time zone set to: %d\r\n", timeZone);
+        return true;
+    }
+    return false;
+}
+
+/**
+* True if given time is inside DST period (aka. summer time). False otherwise.
+* @param[in] time to make the calculation with
+* @param[out] True = time in summertime period
+*			  False = time ouside summertime period
+*/
+boolean isSummerTimePeriod (time_t moment) {
+    return summertime (year (), month (), day (), hour (), getTimeZone ());
+}
 
 } // extern "C++"
 #endif // __cplusplus

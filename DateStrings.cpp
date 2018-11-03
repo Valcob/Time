@@ -95,3 +95,61 @@ char* dayShortStr(uint8_t day)
    buffer[dt_SHORT_STR_LEN] = 0; 
    return buffer;
 }
+
+/**
+* Convert current time to a String.
+* @param[out] String constructed from current time.
+* TODO: Add internationalization support
+*/
+String getTimeStr () { return getTimeStr (now ()); }
+
+
+/**
+* Convert current date to a String.
+* @param[out] String constructed from current date.
+* TODO: Add internationalization support
+*/
+String getDateStr () { return getDateStr (now ()); }
+
+/**
+* Convert current time and date to a String.
+* @param[out] String constructed from current time.
+* TODO: Add internationalization support
+*/
+String getTimeDateString () { return getTimeDateString (now ()); }
+
+/**
+* Convert a time in UNIX format to a String representing time.
+* @param[out] String constructed from current time.
+* @param[in] time_t object to convert to extract time.
+* TODO: Add internationalization support
+*/
+String getTimeStr (time_t moment) {
+   char timeStr[10];
+   sprintf (timeStr, "%02d:%02d:%02d", hour (moment), minute (moment), second (moment));
+
+   return timeStr;
+}
+
+/**
+* Convert a time in UNIX format to a String representing its date.
+* @param[out] String constructed from current date.
+* @param[in] time_t object to convert to extract date.
+* TODO: Add internationalization support
+*/
+String getDateStr (time_t moment) {
+   char dateStr[12];
+   sprintf (dateStr, "%02d/%02d/%4d", day (moment), month (moment), year (moment));
+
+   return dateStr;
+}
+
+/**
+* Convert current time and date to a String.
+* @param[in] time_t object to convert to String.
+* @param[out] String constructed from current time.
+* TODO: Add internationalization support
+*/
+String getTimeDateString (time_t moment) {
+   return getTimeStr (moment) + " " + getDateStr (moment);
+}
